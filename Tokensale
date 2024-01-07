@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract TokenSale {
+
+    ERC20 public token;
+    address public owner;
+
+
+    uint256 public presaleCap;
+    uint256 public presaleMinContribution;
+    uint256 public presaleMaxContribution;
+    bool public presaleActive;
+
+    // Public sale details
+    uint256 public publicSaleCap;
+    uint256 public publicSaleMinContribution;
+    uint256 public publicSaleMaxContribution;
+    bool public publicSaleActive;
+
+    mapping(address => uint256) public presaleContributions;
+    mapping(address => uint256) public publicSaleContributions;
+
+ 
+    event TokensPurchased(address indexed buyer, uint256 amount, bool isPresale);
+    event TokensDistributed(address indexed recipient, uint256 amount);
+    event RefundClaimed(address indexed contributor, uint256 amount);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not authorized");
+        _;
+    }
+
+    modifier onlyWhilePresaleActive() {
+        require(presaleActive, "Presale is not active");
+        _;
+    }
+
+    modifier onlyWhilePublicSaleActive() {
+        require(publicSaleActive, "Public sale is not active");
+        _;
+    }
+
+    constructor(
+        ERC20 _token,
+        uint256 _presaleCap,
+        uint256 _presaleMinContribution,
+        uint256 _presaleMaxContribution,
+        uint256 _publicSaleCap,
+        uint256 _publicSaleMinContribution,
+        uint256 _publicSaleMaxContribution
+    ) {
+        token = _token;
+        owner = msg.sender;
+        presaleCap = _presaleCap;
+        presaleMinContribution = _presaleMinContribution;
+        presaleMaxContribution = _presaleMaxContribution;
+        publicSaleCap = _publicSaleCap;
+        publicSaleMinContribution = _publicSaleMinContribution;
+        publicSaleMaxContribution = _publicSaleMaxContribution;
+        presaleActive = true;
+        publicSaleActive = false;
+    }
+
+  
+    function contributeToPresale() external payable onlyWhilePresaleActive {
+        require(msg.value >= presaleMinContribution && msg.value <= presaleMaxContribution, "Invalid contribution amount");
+        require(address(this).balance + msg.value <= presaleCap, "Presale cap reached");
+
+        uint256 tokenAmount = calculateTokenAmount(msg.value);
+
+      
+        token.transfer(msg.sender, tokenAmount);
+
+      
+        presaleContributions[msg.sender] += msg.value;
+
+        emit TokensPurchased(msg.sender, tokenAmount, true);
+    }
+
+   
+    function contributeToPublicSale() external payable onlyWhilePublicSaleActive {
+        require(msg.value >= publicSaleMinContribution && msg.value <= publicSaleMaxContribution, "Invalid contribution amount");
+        require(address(this).balance + msg.value <= publicSaleCap, "Public sale cap reached");
+
+     
+        uint256 tokenAmount = calculateTokenAmount(msg.value);
+
+        token.transfer(msg.sender, tokenAmount);
+       publicSaleContributions[msg.sender] += msg.value;
+
+        emit TokensPurchased(msg.sender, tokenAmount, false);
+    }
+
+    function distributeTokens(address recipient, uint256 amount) external onlyOwner {
+        token.transfer(recipient, amount);
+        emit TokensDistributed(recipient, amount);
+    }
+
+   
+    function claimRefund() external {
+        require(!presaleActive && !publicSaleActive, "Refund not available during active sale");
+        uint256 contribution = presaleContributions[msg.sender] + publicSaleContributions[msg.sender];
+        require(contribution > 0, "No contribution found");
+
+       
+        payable(msg.sender).transfer(contribution);
+
+        emit RefundClaimed(msg.sender, contribution);
+    }
+
+  
+    function endPresale() external onlyOwner {
+        presaleActive = false;
+        publicSaleActive = true;
+    }
+
+  
+    function endPublicSale() external onlyOwner {
+        publicSaleActive = false;
+    }
+
+
+    function calculateTokenAmount(uint256 _ether) internal pure returns (uint256) {
+       
+        uint256 rate = 100;
+        return _ether * rate;
+    }
+
+    
+    receive() external payable {
+     
+    }
+}

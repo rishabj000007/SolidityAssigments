@@ -1,0 +1,103 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract VotingSystem {
+    address public owner;
+
+    
+    struct Voter {
+        bool isRegistered;
+        bool hasVoted;
+        uint256 votedFor;
+    }
+
+    
+    struct Candidate {
+        string name;
+        uint256 voteCount;
+    }
+
+   
+    mapping(address => Voter) public voters;
+
+    
+    Candidate[] public candidates;
+
+    
+    event VoterRegistered(address voterAddress);
+
+   
+    event CandidateAdded(string name);
+
+   
+    event VoteCast(address voterAddress, string candidateName);
+
+   
+    event VotingResults(string winner);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    
+    function registerToVote() external {
+        require(!voters[msg.sender].isRegistered, "You are already registered");
+
+        voters[msg.sender].isRegistered = true;
+
+        emit VoterRegistered(msg.sender);
+    }
+
+    
+    function addCandidate(string memory _name) external onlyOwner {
+        candidates.push(Candidate(_name, 0));
+
+        emit CandidateAdded(_name);
+    }
+
+    
+    function castVote(uint256 _candidateIndex) external {
+        require(voters[msg.sender].isRegistered, "You are not registered to vote");
+        require(!voters[msg.sender].hasVoted, "You have already voted");
+        require(_candidateIndex < candidates.length, "Invalid candidate index");
+
+        voters[msg.sender].hasVoted = true;
+        voters[msg.sender].votedFor = _candidateIndex;
+        candidates[_candidateIndex].voteCount++;
+
+        emit VoteCast(msg.sender, candidates[_candidateIndex].name);
+    }
+
+    
+    function getCandidateCount() external view returns (uint256) {
+        return candidates.length;
+    }
+
+    
+    function getCandidateDetails(uint256 _candidateIndex) external view returns (string memory, uint256) {
+        require(_candidateIndex < candidates.length, "Invalid candidate index");
+        return (candidates[_candidateIndex].name, candidates[_candidateIndex].voteCount);
+    }
+
+    
+    function getVotingResults() external view returns (string memory) {
+        require(candidates.length > 0, "No candidates added yet");
+
+        uint256 maxVotes = 0;
+        uint256 winningCandidateIndex = 0;
+
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (candidates[i].voteCount > maxVotes) {
+                maxVotes = candidates[i].voteCount;
+                winningCandidateIndex = i;
+            }
+        }
+
+        return candidates[winningCandidateIndex].name;
+    }
+}
